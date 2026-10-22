@@ -194,13 +194,13 @@ bool NPCRecordManager::parseRecordFile(StringView filePath, NPCRecord& record)
 			{
 				syncData.SurfingData.type = PlayerSurfingData::Type::None;
 			}
-			else if (syncData.SurfingData.ID < VEHICLE_POOL_SIZE)
+			else if (syncData.SurfingData.ID < SURFING_VEHICLE_ID_LIMIT)
 			{
 				syncData.SurfingData.type = PlayerSurfingData::Type::Vehicle;
 			}
-			else if (syncData.SurfingData.ID < VEHICLE_POOL_SIZE + OBJECT_POOL_SIZE)
+			else if (syncData.SurfingData.ID < SURFING_VEHICLE_ID_LIMIT + OBJECT_POOL_SIZE)
 			{
-				syncData.SurfingData.ID -= VEHICLE_POOL_SIZE;
+				syncData.SurfingData.ID -= SURFING_VEHICLE_ID_LIMIT;
 				syncData.SurfingData.type = PlayerSurfingData::Type::Object;
 			}
 			else

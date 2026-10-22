@@ -1641,13 +1641,13 @@ namespace Packet
 			{
 				SurfingData.type = PlayerSurfingData::Type::None;
 			}
-			else if (SurfingData.ID < VEHICLE_POOL_SIZE)
+			else if (SurfingData.ID < SURFING_VEHICLE_ID_LIMIT)
 			{
 				SurfingData.type = PlayerSurfingData::Type::Vehicle;
 			}
-			else if (SurfingData.ID < VEHICLE_POOL_SIZE + OBJECT_POOL_SIZE)
+			else if (SurfingData.ID < SURFING_VEHICLE_ID_LIMIT + OBJECT_POOL_SIZE)
 			{
-				SurfingData.ID -= VEHICLE_POOL_SIZE;
+				SurfingData.ID -= SURFING_VEHICLE_ID_LIMIT;
 				SurfingData.type = PlayerSurfingData::Type::Object;
 			}
 			else
@@ -1696,7 +1696,7 @@ namespace Packet
 				}
 				else if (SurfingData.type == PlayerSurfingData::Type::Object)
 				{
-					id = SurfingData.ID + VEHICLE_POOL_SIZE;
+					id = SurfingData.ID + SURFING_VEHICLE_ID_LIMIT;
 				}
 				bs.writeUINT16(id);
 				bs.writeVEC3(SurfingData.offset);
