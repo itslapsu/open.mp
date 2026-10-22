@@ -1,5 +1,15 @@
 FROM debian:11
+# Debian 11 is end of life: its packages and security updates moved to archive.debian.org
 RUN \
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do \
+        [ -f "$f" ] && sed -i \
+            -e 's|deb.debian.org/debian-security|archive.debian.org/debian-security|g' \
+            -e 's|security.debian.org/debian-security|archive.debian.org/debian-security|g' \
+            -e 's|deb.debian.org/debian|archive.debian.org/debian|g' \
+            -e '/bullseye-updates/d' \
+            "$f"; \
+    done; \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99archive && \
     dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y \
