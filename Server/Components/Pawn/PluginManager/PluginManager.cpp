@@ -6,6 +6,8 @@
  *  The original code is copyright (c) 2022, open.mp team and contributors.
  */
 
+#include <cerrno>
+#include <cstring>
 #include <ghc/filesystem.hpp>
 #include "PluginManager.hpp"
 #include "../utils.hpp"
@@ -16,15 +18,16 @@ struct BrokenPluginMessageData
 	StringView message;
 };
 
-static const StaticArray<BrokenPluginMessageData, 23> BrokenPlugins = {
+static const StaticArray<BrokenPluginMessageData, 25> BrokenPlugins = {
 	{
 		{ "YSF", "It requires memory hacking to run and is therefore broken on open.mp, we already added many built-in features from YSF to open.mp and the rest are coming" },
 		{ "YSF_DL", "It requires memory hacking to run and is therefore broken on open.mp, we already added many built-in features from YSF to open.mp and the rest are coming" },
 		{ "YSF_static", "It requires memory hacking to run and is therefore broken on open.mp, we already added many built-in features from YSF to open.mp and the rest are coming" },
 		{ "YSF_DL_static", "It requires memory hacking to run and is therefore broken on open.mp, we already added many built-in features from YSF to open.mp and the rest are coming" },
+		{ "fixes2", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
+		{ "FCNPC", "It requires memory hacking to run and is therefore broken on open.mp, we already have NPC component with many built-in features in open.mp" },
+		{ "FCNPC-DL", "It requires memory hacking to run and is therefore broken on open.mp, we already have NPC component with many built-in features in open.mp" },
 		{ "SKY", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
-		{ "FCNPC", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
-		{ "FCNPC-DL", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
 		{ "sampcac_server", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
 		{ "ASAN", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
 		{ "samp-custom-query-flood-check", "It requires memory hacking to run and is therefore broken on open.mp. There should be a replacement component supported by open.mp" },
@@ -38,6 +41,7 @@ static const StaticArray<BrokenPluginMessageData, 23> BrokenPlugins = {
 		{ "pawncmd", "There is an open.mp compatible version you can find here: https://github.com/katursis/Pawn.CMD/releases , make sure to download x.x.x-omp version." },
 		{ "sampvoice", "There is an open.mp compatible version you can find here: https://github.com/AmyrAhmady/sampvoice/releases , make sure to download x.x.x-omp version." },
 
+		{ "fmt", "It is not needed anymore since open.mp has support for formatted strings in various natives" },
 		{ "nativechecker", "It is not needed anymore since open.mp has built in native checking mechanism when a script is being loaded" },
 		{ "samp-compat", "It is not needed anymore since open.mp has built in compat mechanism between 0.3.7 and 0.3DL versions" },
 		{ "LFN", "It is not needed anymore since open.mp has support for longer function names, just compile your scripts with our compiler" },
@@ -102,7 +106,9 @@ void PawnPluginManager::Spawn(std::string const& name)
 	// otherwise, don't, as they may have supplied a full abs/rel path.
 	// std::string ext = utils::endsWith(name, ".amx") ? "" : ".amx";
 
-	std::string canon;
+	core->printLn("Loading plugin: %s", name.c_str());
+
+	std::string pluginFile = basePath_ + pluginPath_ + name;
 #ifndef WIN32
 	size_t pos = name.rfind(".so");
 	// You would think this could be done in one comparison, but the path may
@@ -110,15 +116,24 @@ void PawnPluginManager::Spawn(std::string const& name)
 	if (pos == std::string::npos || pos + 3 != name.length())
 	{
 		// Append the extension.
-		utils::Canonicalise(basePath_ + pluginPath_ + name + ".so", canon);
+		pluginFile += ".so";
 	}
-	else
 #endif // WIN32
-	{
-		utils::Canonicalise(basePath_ + pluginPath_ + name, canon);
-	}
 
-	core->printLn("Loading plugin: %s", name.c_str());
+	// On Linux, `Canonicalise` uses `realpath`, which fails if the path cannot
+	// be resolved.  Don't hand an unresolved path to the loader, which would
+	// otherwise `dlopen("")` and match a symbol from the main program.
+	std::string canon;
+	if (!utils::Canonicalise(pluginFile, canon))
+	{
+#ifndef WIN32
+		const int pathError = errno;
+		core->printLn("Could not load plugin:\n%s: %s", pluginFile.c_str(), std::strerror(pathError));
+#else
+		core->printLn("Could not resolve plugin path: %s", pluginFile.c_str());
+#endif // WIN32
+		return;
+	}
 
 	std::unique_ptr<PawnPlugin> ptr = std::make_unique<PawnPlugin>(canon, core);
 
