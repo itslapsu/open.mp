@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "master"
+      - "stable"
       - "stable_master"
       - "dev"
     paths:
@@ -185,6 +186,82 @@ jobs:
         run: |
           version=${{ steps.vars.outputs.build_version }}
           artifact_name="open.mp-linux-${{ matrix.arch }}${{ matrix.ssl == 'dynamic' && '-dynssl' || '' }}-${version}"
+          echo "artifact_name=${artifact_name}" >> $GITHUB_OUTPUT
+          cd docker/build/Output/*
+          sudo tar -cJvf "${artifact_name}.tar.xz" "Server"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.artifact_name }}
+          path: docker/build/Output/${{ steps.vars.outputs.build_config }}/${{ steps.build.outputs.artifact_name }}.tar.xz
+          if-no-files-found: error
+
+  build-linux-debian11:
+    name: Linux build (Debian 11)
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        arch: [x86, x86_64]
+        ssl: [dynamic, static]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Declare build output variables
+        id: vars
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          echo "build_version=$(git describe --always --tags "refs/remotes/origin/${HEAD_REF}")" >> $GITHUB_OUTPUT
+          echo "build_config=RelWithDebInfo" >> $GITHUB_OUTPUT
+          echo "build_debian_version=11" >> $GITHUB_OUTPUT
+          echo "build_shared=${{ matrix.ssl == 'dynamic' }}" >> $GITHUB_OUTPUT
+          echo "build_server=1" >> $GITHUB_OUTPUT
+          echo "build_tools=0" >> $GITHUB_OUTPUT
+          echo "build_target_arch=${{ matrix.arch }}" >> $GITHUB_OUTPUT
+
+      - name: Set ownership
+        run: |
+          # this is to fix GIT not liking owner of the checkout dir
+          chown -R $(id -u):$(id -g) $PWD
+
+      - name: Try to restore conan cache
+        id: conan-cache-restore
+        uses: actions/cache/restore@v3
+        env:
+          cache-name: cache-conan-modules
+        with:
+          path: docker/conan2/p
+          key: conan-debian11-${{ matrix.arch }}-${{ matrix.ssl }}-${{ hashFiles('CMakeLists.txt', 'lib/CMakeLists.txt', 'SDK/CMakeLists.txt', 'SDK/lib/cmake-conan/conan.cmake', 'SDK/lib/cmake-conan/conan-omp.cmake') }}
+
+      - name: Build
+        run: |
+          cd docker
+          CONFIG=${{ steps.vars.outputs.build_config }} DEBIAN_VERSION=${{ steps.vars.outputs.build_debian_version }} BUILD_SHARED=${{ steps.vars.outputs.build_shared }} BUILD_SERVER=${{ steps.vars.outputs.build_server }} BUILD_TOOLS=${{ steps.vars.outputs.build_tools }} TARGET_BUILD_ARCH=${{ steps.vars.outputs.build_target_arch }} ./build.sh
+
+      - name: Try to save conan cache
+        if: steps.conan-cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v3
+        env:
+          cache-name: cache-conan-modules
+        with:
+          path: docker/conan2/p
+          key: ${{ steps.conan-cache-restore.outputs.cache-primary-key }}
+
+      - name: Create a build archive
+        id: build
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          version=${{ steps.vars.outputs.build_version }}
+          artifact_name="open.mp-debian11-${{ matrix.arch }}${{ matrix.ssl == 'dynamic' && '-dynssl' || '' }}-${version}"
           echo "artifact_name=${artifact_name}" >> $GITHUB_OUTPUT
           cd docker/build/Output/*
           sudo tar -cJvf "${artifact_name}.tar.xz" "Server"

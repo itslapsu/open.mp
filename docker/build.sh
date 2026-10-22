@@ -8,6 +8,8 @@
 [[ -z "$UBUNTU_VERSION" ]] \
 && ubuntu_version=20.04 \
 || ubuntu_version="$UBUNTU_VERSION"
+# Debian build image (11), used instead of the Ubuntu one when set
+[[ -z "$DEBIAN_VERSION" ]] && os_name=ubuntu os_version=${ubuntu_version} || { os_name=debian; os_version="$DEBIAN_VERSION"; }
 # Available options: [true], false
 [[ -z "$BUILD_SHARED" ]] \
 && build_shared=1 \
@@ -26,8 +28,8 @@
 || target_build_arch="$TARGET_BUILD_ARCH"
 
 docker build \
-    -t open.mp/build:ubuntu-${ubuntu_version} \
-    build_ubuntu-${ubuntu_version}/ \
+    -t open.mp/build:${os_name}-${os_version} \
+    build_${os_name}-${os_version}/ \
 || exit 1
 
 folders=('build' 'conan2')
@@ -52,4 +54,4 @@ docker run \
     -e BUILD_TOOLS=${build_tools} \
     -e OMP_BUILD_VERSION=$(git rev-list $(git rev-list --max-parents=0 HEAD) HEAD | wc -l) \
     -e OMP_BUILD_COMMIT=$(git rev-parse HEAD) \
-    open.mp/build:ubuntu-${ubuntu_version}
+    open.mp/build:${os_name}-${os_version}
